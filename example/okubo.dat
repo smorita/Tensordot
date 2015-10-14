@@ -1,0 +1,13 @@
+# From Okubo-san
+tensor rho i j k l
+tensor o1 i f1 f2
+tensor o2 j f3 f4
+tensor o3 k f5 f6
+tensor o4 l f7 f8
+tensor u1 f1 f6 g1 g2 
+tensor u2 f5 f2 g3 g4
+tensor u3 f3 f8 g5 g6
+tensor u4 f7 f4 g3 g7
+tensor op1 g2 g6
+tensor op2 g1 g5
+tensor op3 g4 g7

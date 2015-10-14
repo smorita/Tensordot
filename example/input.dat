@@ -1,0 +1,40 @@
+# Set default value of bond dimension. Default: 10
+# This line should be written before tensor definitions.
+#default_demension 10
+
+# Define a tensor and its connected bonds
+# The names of bonds should be unique.
+#tensor tensor_name bond_name [bond_name...]
+tensor A i j
+tensor B j k l
+tensor C k l m
+
+# Set bond dimension. Default: 10
+# This line should be written after tensor definitions.
+bond i 5
+bond j 6
+bond k 7
+bond l 8
+bond m 9
+
+# Set the final bond order.
+order m i
+
+
+# Set the output style. Default: numpy
+#style mptensor
+
+# Set the name of numpy library. Default: np
+#numpy numpy
+
+# Set the number of space for indent. Default: 4
+#indent 2
+
+# Set time limit. Default 600.0 [sec]
+#time_limit 60.0
+
+# Set interval of info output. Default: 5.0 [sec]
+#info_interval 1.0
+
+# Debug mode
+#debug
