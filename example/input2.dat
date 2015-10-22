@@ -1,13 +1,13 @@
 # style python
 style mptensor
-tensor VL v3 h1 d3 
-tensor VR v2 h1 d1 
-tensor VLT v1 h0 d2 
-tensor VRT v0 h0 d0 
-tensor x H0 d0 d1 
-tensor y d2 d3 H1 
-tensor w v0 v1 V0 
-tensor wt v2 v3 V1 
+tensor VL v3 h1 d3
+tensor VR v2 h1 d1
+tensor VLT v1 h0 d2
+tensor VRT v0 h0 d0
+tensor x H0 d0 d1
+tensor y d2 d3 H1
+tensor w v0 v1 V0
+tensor wt v2 v3 V1
 bond v0 10
 bond v1 10
 bond v2 10
