@@ -496,6 +496,9 @@ def add_transpose(tn,script,bond_order):
     if not sorted(f_order)==sorted(bond_order):
         logging.warning("The final bond order is invalid. It is ignored.")
         return script,bond_order
+    elif f_order == bond_order:
+        logging.info("The final bond order was requested, but Transpose is not necessary.")
+        return script, bond_order
 
     axes = [ bond_order.index(b) for b in f_order ]
     return transpose_script(script,axes), f_order
