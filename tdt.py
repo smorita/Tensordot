@@ -539,7 +539,10 @@ def read_file(filename, tn):
             elif command=="order":
                 FINAL_ORDER = data[1:]
 
-def output_result(script,math_script,cpu,mem,final_bonds):
+
+def output_result(script,math_script,cpu,mem,final_bonds,input_file):
+    print config.COMMENT_PREFIX*30
+    print config.COMMENT_PREFIX, input_file
     print config.COMMENT_PREFIX*30
     print config.COMMENT_PREFIX, math_script
     print config.COMMENT_PREFIX, "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem)
@@ -552,7 +555,8 @@ def main(rand_flag=False,iteration=0):
     tn = TensorNetwork()
 
     # Read input file
-    read_file(sys.argv[1], tn)
+    input_file = sys.argv[1]
+    read_file(input_file, tn)
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
@@ -570,7 +574,7 @@ def main(rand_flag=False,iteration=0):
 
     final_bonds = "(" + ", ".join([BOND_NAMES[b] for b in bond_order]) + ")"
 
-    output_result(script,get_math(rpn),cpu,mem,final_bonds)
+    output_result(script,get_math(rpn),cpu,mem,final_bonds,input_file)
 
 
 if __name__ == "__main__":
