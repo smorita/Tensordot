@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import argparse
 import logging
 import time
 import random
@@ -504,61 +505,73 @@ def add_transpose(tn,script,bond_order):
     return transpose_script(script,axes), f_order
 
 
-def read_file(filename, tn):
+def set_style(style):
+    if style=="numpy":
+        config.STYLE = "numpy"
+        config.COMMENT_PREFIX = "#"
+    elif style=="mptensor":
+        config.STYLE = "mptensor"
+        config.COMMENT_PREFIX = "//"
+
+
+def read_file(infile, tn):
     """Read input file"""
     global FINAL_ORDER
 
-    with open(filename, 'r') as f:
-        for line in f:
-            data = line.split()
-            if data==[]: continue
+    for line in infile:
+        data = line.split()
+        if data==[]: continue
 
-            command = data[0].lower()
-            if command=="style":
-                if data[1].lower()=="mptensor":
-                    config.STYLE = "mptensor"
-                    config.COMMENT_PREFIX = "//"
-            elif command=="numpy":
-                config.NUMPY = data[1]
-            elif command=="indent":
-                config.INDENT = " " * int(data[1])
-            elif command=="time_limit":
-                config.TIME_LIMIT = float(data[1])
-            elif command=="info_interval":
-                config.INFO_INTERVAL = float(data[1])
-            elif command=="default_dimension":
-                # Should be set the top of input file.
-                config.DEFAULT_BOND_DIM = int(data[1])
-            elif command=="memory_acceptable_ratio":
-                config.MEMORY_ACCEPTABLE_RATIO = max(float(data[1]), 1.0)
-            elif command=="debug":
-                config.LOGGING_LEVEL = logging.DEBUG
+        command = data[0].lower()
+        if command=="style":
+            set_style(data[1].lower())
+        elif command=="numpy":
+            config.NUMPY = data[1]
+        elif command=="indent":
+            config.INDENT = " " * int(data[1])
+        elif command=="time_limit":
+            config.TIME_LIMIT = float(data[1])
+        elif command=="info_interval":
+            config.INFO_INTERVAL = float(data[1])
+        elif command=="default_dimension":
+            # Should be set the top of input file.
+            config.DEFAULT_BOND_DIM = int(data[1])
+        elif command=="memory_acceptable_ratio":
+            config.MEMORY_ACCEPTABLE_RATIO = max(float(data[1]), 1.0)
+        elif command=="debug":
+            config.LOGGING_LEVEL = logging.DEBUG
 
-            elif command=="tensor":
-                tn.add_tensor(data[1], data[2:])
-            elif command=="bond":
-                set_bond_dim(data[1], int(data[2]))
-            elif command=="order":
-                FINAL_ORDER = data[1:]
+        elif command=="tensor":
+            tn.add_tensor(data[1], data[2:])
+        elif command=="bond":
+            set_bond_dim(data[1], int(data[2]))
+        elif command=="order":
+            FINAL_ORDER = data[1:]
+    infile.close()
 
 
-def output_result(script,math_script,cpu,mem,final_bonds,input_file):
-    print config.COMMENT_PREFIX*30
-    print config.COMMENT_PREFIX, input_file
-    print config.COMMENT_PREFIX*30
-    print config.COMMENT_PREFIX, math_script
-    print config.COMMENT_PREFIX, "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem)
-    print config.COMMENT_PREFIX, "final_bond_order ", final_bonds
-    print config.COMMENT_PREFIX*30
-    print "\n".join(script)
+def output_result(outfile,script,math_script,cpu,mem,final_bonds,input_file):
+    BR = "\n"
+    SP = " "
+    output = [config.COMMENT_PREFIX*30,
+              config.COMMENT_PREFIX + SP + input_file,
+              config.COMMENT_PREFIX*30,
+              config.COMMENT_PREFIX + SP + math_script,
+              config.COMMENT_PREFIX + SP + "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem),
+              config.COMMENT_PREFIX + SP + "final_bond_order " + final_bonds,
+              config.COMMENT_PREFIX*30]
+    output += script
+    outfile.write(BR.join(output) + BR)
 
 
-def main(rand_flag=False,iteration=0):
+def main(args,rand_flag=False):
     tn = TensorNetwork()
 
     # Read input file
-    input_file = sys.argv[1]
-    read_file(input_file, tn)
+    read_file(args.infile, tn)
+
+    # Overwrite by command-line option
+    set_style(args.style)
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
@@ -567,8 +580,7 @@ def main(rand_flag=False,iteration=0):
     tn.init()
 
     if rand_flag:
-        iteration = config.RANDOM_ITERATION if iteration<1 else iteration
-        rpn, cpu, mem = random_search(tn,iteration)
+        rpn, cpu, mem = random_search(tn, max(1,args.iteration))
     else:
         rpn, cpu, mem = find_path(tn)
     script, bond_order = get_script(tn, rpn)
@@ -576,11 +588,27 @@ def main(rand_flag=False,iteration=0):
 
     final_bonds = "(" + ", ".join([BOND_NAMES[b] for b in bond_order]) + ")"
 
-    output_result(script,get_math(rpn),cpu,mem,final_bonds,input_file)
+    output_result(args.outfile,
+                  script,get_math(rpn),cpu,mem,final_bonds,
+                  args.infile.name)
+
+
+def add_default_arguments(parser):
+    parser.add_argument('-s', metavar='style', dest='style',
+                        type=str, default=None,
+                        choices=['numpy', 'mptensor'],
+                        help='set output style ("numpy" or "mptensor")')
+    parser.add_argument('-o', metavar='outfile', dest='outfile',
+                        type=argparse.FileType('w'), default=sys.stdout,
+                        help='write the result to outfile')
+    parser.add_argument('infile',
+                        type=argparse.FileType('r'),
+                        help='tensor-network definition file')
 
 
 if __name__ == "__main__":
-    if len(sys.argv)<2:
-        sys.exit("Usage: ./tdt.py input_file")
+    parser = argparse.ArgumentParser(description="Code generator for tensor contruction")
+    add_default_arguments(parser)
+    args = parser.parse_args()
 
-    main()
+    main(args)

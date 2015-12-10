@@ -1,10 +1,16 @@
 #!/usr/bin/env python
 import sys
+import argparse
 import tdt
 
-if __name__ == "__main__":
-    if len(sys.argv)<2:
-        sys.exit("Usage: ./rtdt.py input_file [iteration]")
+DEFAULT_ITERATION = 10000
 
-    iteration = 0 if len(sys.argv)<3 else int(sys.argv[2])
-    tdt.main(True,iteration)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate a tensordot code by random search.")
+    tdt.add_default_arguments(parser)
+    parser.add_argument('iteration', nargs='?',
+                        type=int, default=DEFAULT_ITERATION,
+                        help='the number of random search try (default: {})'.format(DEFAULT_ITERATION))
+    args = parser.parse_args()
+
+    tdt.main(args,rand_flag=True)
