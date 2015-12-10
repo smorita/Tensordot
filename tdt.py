@@ -159,7 +159,7 @@ class TensorNetwork:
         cpu_cost = self.cpu_cost + cpu
 
         # The case that max_memory==min_mem is accept
-        judge = (cpu_cost < min_cpu-0.5) and (max_memory < min_mem+0.5)
+        judge = (cpu_cost < min_cpu-0.5) and (max_memory < config.MEMORY_ACCEPTABLE_RATIO*min_mem+0.5)
 
         return judge
 
@@ -529,6 +529,8 @@ def read_file(filename, tn):
             elif command=="default_dimension":
                 # Should be set the top of input file.
                 config.DEFAULT_BOND_DIM = int(data[1])
+            elif command=="memory_acceptable_ratio":
+                config.MEMORY_ACCEPTABLE_RATIO = max(float(data[1]), 1.0)
             elif command=="debug":
                 config.LOGGING_LEVEL = logging.DEBUG
 
