@@ -1,5 +1,5 @@
 # Tensordot
-Code generator for tensor contruction
+Code generator for tensor contraction
 
 ## 使用方法
 
