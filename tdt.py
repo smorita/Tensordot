@@ -11,6 +11,7 @@ TENSOR_NAMES = []
 BOND_NAMES = []
 BOND_DIMS = []
 FINAL_ORDER = None
+INFO_TIME_LIMIT = [False, 0, 0]
 
 class Tensor:
     def __init__(self,name=None,bonds=[]):
@@ -224,6 +225,7 @@ def string_stack(stack):
     return "".join( [str(s[0]) for s in stack] )
 
 def find_path(tn_orig):
+    global INFO_TIME_LIMIT
     min_cpu = sys.float_info.max
     min_mem = sys.float_info.max
     max_level=len(tn_orig.tensors)-1
@@ -236,6 +238,7 @@ def find_path(tn_orig):
     stack = []
     for i,b in enumerate(tn_tree[0].bonds):
         if not b.isFree(): stack.append((0,i))
+    INFO_TIME_LIMIT[2] = len(stack)
 
     count = -1
     count_find = 0
@@ -257,7 +260,9 @@ def find_path(tn_orig):
             logging.debug(log_prefix+"{0} min_cpu={1:.6e} min_mem={2:.6e}".format(
                 string_stack(stack), min_cpu, min_mem))
         if now-start_time > config.TIME_LIMIT:
-            logging.warning(log_prefix+"Stop by time limit.")
+            logging.warning(log_prefix+"Stopped by time limit.")
+            INFO_TIME_LIMIT[0] = True
+            INFO_TIME_LIMIT[1] = len([s for s in stack if s[0]==0])+1
             stack = []
             continue
 
@@ -323,6 +328,8 @@ def next_items(bonds,br0,br1,bond,next_level):
 
 
 def random_search(tn_orig,iteration):
+    global INFO_TIME_LIMIT
+
     min_cpu = sys.float_info.max
     min_mem = sys.float_info.max
     max_level=len(tn_orig.tensors)-1
@@ -392,7 +399,11 @@ def random_search(tn_orig,iteration):
                     script, tn.cpu_cost, tn.max_memory))
 
         if now-start_time > config.TIME_LIMIT:
-            logging.warning(log_prefix+"Stop by time limit.")
+            logging.warning(log_prefix+"Stopped by time limit.")
+            INFO_TIME_LIMIT[0] = True
+            INFO_TIME_LIMIT[1] = count
+            INFO_TIME_LIMIT[2] = iteration
+            print INFO_TIME_LIMIT
             break
 
     logging.info(log_prefix+"Finish {0}/{1} script={2}".format(count_find, count, script))
@@ -517,7 +528,7 @@ def set_time_limit(time_limit):
     if time_limit is None:
         pass
     elif time_limit>0.0:
-        config.TIME_LIMIT = args.time_limit
+        config.TIME_LIMIT = time_limit
     else:
         config.TIME_LIMIT = sys.float_info.max
 
@@ -569,6 +580,12 @@ def output_result(outfile,script,math_script,cpu,mem,final_bonds,input_file):
               config.COMMENT_PREFIX + SP + "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem),
               config.COMMENT_PREFIX + SP + "final_bond_order " + final_bonds,
               config.COMMENT_PREFIX*30]
+    if INFO_TIME_LIMIT[0]:
+        num, den = (INFO_TIME_LIMIT[2]-INFO_TIME_LIMIT[1]), INFO_TIME_LIMIT[2]
+        ratio = 100.0*num/den
+        info = "{0:3.2f}% ({1:d}/{2:d})".format(ratio,num,den)
+        output += [config.COMMENT_PREFIX + SP + "Stopped by time limit. " + info + " was finished.",
+                   config.COMMENT_PREFIX*30]
     output += script
     outfile.write(BR.join(output) + BR)
 
@@ -582,7 +599,6 @@ def main(args,rand_flag=False):
     # Overwrite by command-line option
     set_style(args.style)
     set_time_limit(args.time_limit)
-    print args.time_limit, config.TIME_LIMIT
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
@@ -602,6 +618,8 @@ def main(args,rand_flag=False):
     output_result(args.outfile,
                   script,get_math(rpn),cpu,mem,final_bonds,
                   args.infile.name)
+
+    if INFO_TIME_LIMIT[0]: sys.exit("Stopped by time limit.")
 
 
 def add_default_arguments(parser):
