@@ -513,6 +513,13 @@ def set_style(style):
         config.STYLE = "mptensor"
         config.COMMENT_PREFIX = "//"
 
+def set_time_limit(time_limit):
+    if time_limit is None:
+        pass
+    elif time_limit>0.0:
+        config.TIME_LIMIT = args.time_limit
+    else:
+        config.TIME_LIMIT = sys.float_info.max
 
 def read_file(infile, tn):
     """Read input file"""
@@ -574,6 +581,8 @@ def main(args,rand_flag=False):
 
     # Overwrite by command-line option
     set_style(args.style)
+    set_time_limit(args.time_limit)
+    print args.time_limit, config.TIME_LIMIT
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
@@ -600,6 +609,9 @@ def add_default_arguments(parser):
                         type=str, default=None,
                         choices=['numpy', 'mptensor'],
                         help='set output style ("numpy" or "mptensor")')
+    parser.add_argument('-t', metavar='time_limit', dest='time_limit',
+                        type=float, default=None,
+                        help='set time limit [sec]')
     parser.add_argument('-o', metavar='outfile', dest='outfile',
                         type=argparse.FileType('w'), default=sys.stdout,
                         help='write the result to outfile')
