@@ -1,5 +1,6 @@
 # style python
 style mptensor
+
 tensor VL v3 h1 d3
 tensor VR v2 h1 d1
 tensor VLT v1 h0 d2
@@ -8,17 +9,13 @@ tensor x H0 d0 d1
 tensor y d2 d3 H1
 tensor w v0 v1 V0
 tensor wt v2 v3 V1
-bond v0 10
-bond v1 10
-bond v2 10
-bond v3 10
-bond h0 10
-bond h1 10
-bond d0 100
-bond d1 100
-bond d2 100
-bond d3 100
-bond V0 100
-bond V1 100
-bond H0 100
-bond H1 100
+
+# Set bond dimension. Default: 10
+## old format (The last argument is bond dimension.)
+bond h0 20
+bond h1 20
+bond v0 v1 v2 v3 30
+
+## new format (The 1st argument is bond dimension.)
+bond_dim 100 d0 d1 d2 d3
+bond_dim 100 V0 V1 H0 H1

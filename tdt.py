@@ -544,7 +544,9 @@ def read_file(infile, tn):
         elif command=="tensor":
             tn.add_tensor(data[1], data[2:])
         elif command=="bond":
-            set_bond_dim(data[1], int(data[2]))
+            for b in data[1:-1]: set_bond_dim(b, int(data[-1]))
+        elif command=="bond_dim":
+            for b in data[2:]: set_bond_dim(b, int(data[1]))
         elif command=="order":
             FINAL_ORDER = data[1:]
     infile.close()
