@@ -20,6 +20,10 @@ bond m 9
 # Set the final bond order.
 order m i
 
+# Put a vector on bond
+#vector vector_name bond_name
+vector v0 k
+vector v1 m
 
 # Set the output style. Default: numpy
 #style mptensor

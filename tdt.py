@@ -10,6 +10,7 @@ import config
 TENSOR_NAMES = []
 BOND_NAMES = []
 BOND_DIMS = []
+VECTORS = []
 FINAL_ORDER = None
 INFO_TIME_LIMIT = [False, 0, 0]
 
@@ -500,6 +501,25 @@ def transpose_script(name,axes):
     return script
 
 
+def multiply_vector_script(name,vec_list,rank):
+    if config.STYLE == "numpy":
+        newaxis = ","+config.NUMPY+".newaxis"
+        script = "("+name
+        for axis,vec_name in vec_list:
+            if axis==rank-1:
+                script += "*"+vec_name
+            else:
+                script += "*"+vec_name+"[:"+newaxis*(rank-axis-1)+"]"
+        script += ")"
+    if config.STYLE == "mptensor":
+        arg = []
+        for axis,vec_name in vec_list:
+            arg.append(vec_name)
+            arg.append(str(axis))
+        script = name + ".multiply_vector(" + ",".join(arg)+ ")"
+    return script
+
+
 def add_transpose(tn,script,bond_order):
     if FINAL_ORDER == None: return script, bond_order
 
@@ -567,6 +587,8 @@ def read_file(infile, tn):
             for b in data[2:]: set_bond_dim(b, int(data[1]))
         elif command=="order":
             FINAL_ORDER = data[1:]
+        elif command=="vector":
+            VECTORS.append((data[1], data[2]))
     infile.close()
 
 
@@ -589,9 +611,47 @@ def output_result(outfile,script,math_script,cpu,mem,final_bonds,input_file):
     output += script
     outfile.write(BR.join(output) + BR)
 
+
 def check_bond_order(tn):
     return FINAL_ORDER == None or \
         frozenset(FINAL_ORDER) == frozenset( BOND_NAMES[i] for i,b in enumerate(tn.bonds) if b.isFree() )
+
+
+def check_vector():
+    for v in VECTORS:
+        if v[1] not in BOND_NAMES: return False
+    return True
+
+
+def add_multiply_vector(tn):
+    """Change names of tensors by vector multiplications"""
+    if len(VECTORS)==0: return
+
+    mod_list = [[] for _ in TENSOR_NAMES]
+    for v_name, b_name in VECTORS:
+        assert (b_name in BOND_NAMES), "Vector ({0}) is multiplied to a non-existent bond.".format(v_name)
+        b_index = BOND_NAMES.index(b_name)
+        bond = tn.bonds[b_index]
+        t0, t1 = bond.t0, bond.t1
+        # find a smaller tensor
+        if t0>-1 and t1>-1:
+            mem0 = mem1 = 1.0
+            for b in tn.tensors[t0].bonds: mem0 *= BOND_DIMS[b]
+            for b in tn.tensors[t1].bonds: mem1 *= BOND_DIMS[b]
+            t = t0 if mem0<mem1 else t1
+        else:
+            t = max(t0, t1)
+        axis = tn.tensors[t].bonds.index(b_index)
+        mod_list[t].append((axis,v_name))
+        logging.info("vector : "+v_name+" on bond"+str(b_index)+" -> tensor"+str(t))
+
+    for i,l in enumerate(mod_list):
+        if len(l)==0: continue
+        rank = len(tn.tensors[i].bonds)
+        new_name = multiply_vector_script(TENSOR_NAMES[i],sorted(l),rank)
+        logging.info("vector : "+TENSOR_NAMES[i]+" -> "+new_name)
+        TENSOR_NAMES[i] = new_name
+
 
 def main(args,rand_flag=False):
     tn = TensorNetwork()
@@ -605,7 +665,8 @@ def main(args,rand_flag=False):
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
-    assert check_bond_order(tn) , "Final bond order is invalid."
+    assert check_bond_order(tn), "Final bond order is invalid."
+    assert check_vector(), "Vectors will be put on non-existent bond."
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
     tn.init()
@@ -614,6 +675,8 @@ def main(args,rand_flag=False):
         rpn, cpu, mem = random_search(tn, max(1,args.iteration))
     else:
         rpn, cpu, mem = find_path(tn)
+
+    add_multiply_vector(tn)
     script, bond_order = get_script(tn, rpn)
     script, bond_order = add_transpose(tn, script, bond_order)
 
