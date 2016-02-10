@@ -589,6 +589,9 @@ def output_result(outfile,script,math_script,cpu,mem,final_bonds,input_file):
     output += script
     outfile.write(BR.join(output) + BR)
 
+def check_bond_order(tn):
+    return FINAL_ORDER == None or \
+        frozenset(FINAL_ORDER) == frozenset( BOND_NAMES[i] for i,b in enumerate(tn.bonds) if b.isFree() )
 
 def main(args,rand_flag=False):
     tn = TensorNetwork()
@@ -602,6 +605,7 @@ def main(args,rand_flag=False):
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
+    assert check_bond_order(tn) , "Final bond order is invalid."
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
     tn.init()
