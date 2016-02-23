@@ -225,10 +225,10 @@ def set_bond_dim(bond_name, dim):
 def string_stack(stack):
     return "".join( [str(s[0]) for s in stack] )
 
-def find_path(tn_orig):
+def find_path(tn_orig, script="", min_cpu=sys.float_info.max, min_mem=sys.float_info.max):
     global INFO_TIME_LIMIT
-    min_cpu = sys.float_info.max
-    min_mem = sys.float_info.max
+    # min_cpu = sys.float_info.max
+    # min_mem = sys.float_info.max
     max_level=len(tn_orig.tensors)-1
 
     tn_tree = [[] for i in range(max_level+1)]
@@ -674,7 +674,11 @@ def main(args,rand_flag=False):
     if rand_flag:
         rpn, cpu, mem = random_search(tn, max(1,args.iteration))
     else:
-        rpn, cpu, mem = find_path(tn)
+        if args.iter_pre>0:
+            rpn, cpu, mem = random_search(tn, args.iter_pre)
+            rpn, cpu, mem = find_path(tn, rpn, cpu, mem)
+        else:
+            rpn, cpu, mem = find_path(tn)
 
     add_multiply_vector(tn)
     script, bond_order = get_script(tn, rpn)
@@ -708,6 +712,9 @@ def add_default_arguments(parser):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Code generator for tensor contruction")
     add_default_arguments(parser)
+    parser.add_argument('-r', metavar='iter_pre', dest='iter_pre',
+                        type=int, default=0,
+                        help='set the number of random pre-search iterations (default: 0)')
     args = parser.parse_args()
 
     main(args)
