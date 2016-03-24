@@ -12,21 +12,6 @@ tensor Tn1 k4 k1 k2 k3 m1
 tensor Tn1c l4 l1 l2 l3 m1c
 tensor op1 m1 m1c
 
-bond i1 100
-bond i2 100
-bond i3 100
-bond i4 100
-bond j1 100
-bond j2 100
-bond j3 100
-bond j4 100
-bond k1 10
-bond k2 10
-bond k3 10
-bond k4 10
-bond l1 10
-bond l2 10
-bond l3 10
-bond l4 10
-bond m1 2
-bond m1c 2
+bond_dim 100 i1 i2 i3 i4 j1 j2 j3 j4
+bond_dim 10 k1 k2 k3 k4 l1 l2 l3 l4
+bond_dim 2 m1 m1c
