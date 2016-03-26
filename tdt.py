@@ -8,6 +8,7 @@ import netcon
 
 # Global variables
 TENSOR_NAMES = []
+TENSOR_MATH_NAMES = []
 BOND_NAMES = []
 BOND_DIMS = []
 VECTORS = []
@@ -69,11 +70,6 @@ class TensorNetwork:
         return s
 
 
-    def init(self):
-        self.calculate_memory()
-        self.output_log("input")
-
-
     def clone(self):
         tn = TensorNetwork()
         tn.total_memory = self.total_memory
@@ -90,8 +86,6 @@ class TensorNetwork:
             logging.info(prefix + "tensor{0} : {1} {2}".format(i,TENSOR_NAMES[i],t.bonds))
         for i,b in enumerate(self.bonds):
             logging.info(prefix + "bond{0} : {1} {2} {3}".format(i,BOND_NAMES[i],b,BOND_DIMS[i]))
-        logging.info(prefix + "memory : {0}".format(self.total_memory))
-        logging.info(prefix + "cpu : {0}".format(self.cpu_cost))
 
 
     def add_tensor(self, t_name, b_names):
@@ -109,16 +103,6 @@ class TensorNetwork:
 
         TENSOR_NAMES.append(t_name)
         self.tensors.append(Tensor(t_index,b_indexs))
-
-
-    def calculate_memory(self):
-        mem = 0.0
-        for t in self.tensors:
-            val = 1.0
-            for b in t.bonds: val *= BOND_DIMS[b]
-            mem += val
-        self.total_memory = mem
-        self.max_memory = mem
 
 
     def find_bonds(self, tensor_a, tensor_b):
@@ -205,7 +189,7 @@ def get_math(rpn):
             stack.append( new_name )
 
         else:
-            stack.append(TENSOR_NAMES[c])
+            stack.append(TENSOR_MATH_NAMES[c])
     return stack[0]
 
 
@@ -301,7 +285,11 @@ def multiply_vector_script(name,vec_list,rank):
             arg.append(vec_name)
             arg.append(str(axis))
         script = name + ".multiply_vector(" + ",".join(arg)+ ")"
-    return script
+
+    math = "("+name
+    for axis,vec_name in vec_list: math += "*"+vec_name
+    math += ")"
+    return script, math
 
 
 def add_transpose(tn,script,bond_order):
@@ -340,14 +328,15 @@ def add_multiply_vector(tn):
             t = max(t0, t1)
         axis = tn.tensors[t].bonds.index(b_index)
         mod_list[t].append((axis,v_name))
-        logging.info("vector : "+v_name+" on bond"+str(b_index)+" -> tensor"+str(t))
+        logging.debug("vector: "+v_name+" on bond"+str(b_index)+" -> tensor"+str(t))
 
     for i,l in enumerate(mod_list):
         if len(l)==0: continue
         rank = len(tn.tensors[i].bonds)
-        new_name = multiply_vector_script(TENSOR_NAMES[i],sorted(l),rank)
-        logging.info("vector : "+TENSOR_NAMES[i]+" -> "+new_name)
+        new_name, new_math = multiply_vector_script(TENSOR_NAMES[i],sorted(l),rank)
+        logging.info("vector: "+TENSOR_NAMES[i]+" -> "+new_math)
         TENSOR_NAMES[i] = new_name
+        TENSOR_MATH_NAMES[i] = new_math
 
 
 def read_file(infile, tn):
@@ -459,10 +448,11 @@ if __name__ == "__main__":
     assert check_vector(), "Vectors will be put on non-existent bond."
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
-    tn.init()
+    tn.output_log("input")
     rpn, cpu = netcon.netcon(tn, BOND_DIMS)
     mem = get_memory(tn, rpn)
 
+    TENSOR_MATH_NAMES = TENSOR_NAMES[:]
     add_multiply_vector(tn)
     script, bond_order = get_script(tn, rpn)
     script, bond_order = add_transpose(tn, script, bond_order)
