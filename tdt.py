@@ -159,6 +159,41 @@ class TensorNetwork:
         return tn
 
 
+def get_memory(tn_orig,rpn):
+    """Caluculate memory cost for contractions from Reverse Polish Notation"""
+    tn = tn_orig.clone()
+    cost = []
+    for item in rpn:
+        if item==-1:
+            c1 = cost.pop()
+            c0 = cost.pop()
+
+            index1 = c1[0]
+            index0 = c0[0]
+
+            t0 = tn.tensors[index0]
+            t1 = tn.tensors[index1]
+
+            bc, br0, br1 = tn.find_bonds(index0, index1)
+
+            mem_start = c0[2] + c1[2]
+            mem_end = 1.0
+            for b in br0 + br1: mem_end *= BOND_DIMS[b]
+            mem_req = max(c0[1]+c1[2], c0[1]+c1[3], c0[2]+c1[1], c0[3]+c1[1], mem_end+c0[3]+c1[3])
+
+            tn = tn.contract(index0, index1, bc, br0, br1)
+
+            cost.append( (index0, mem_req, mem_start, mem_end) )
+
+        else:
+            t = tn.tensors[item]
+            val = 1.0
+            for b in t.bonds: val *= BOND_DIMS[b]
+            cost.append( (item, val, val, val) ) # (index, mem_req, mem_start, mem_end)
+
+    return cost[0][1]
+
+
 def get_math(rpn):
     """Generate mathematical formula from Reverse Polish Notation"""
     stack = []
@@ -426,7 +461,7 @@ if __name__ == "__main__":
 
     tn.init()
     rpn, cpu = netcon.netcon(tn, BOND_DIMS)
-    mem = 0.0
+    mem = get_memory(tn, rpn)
 
     add_multiply_vector(tn)
     script, bond_order = get_script(tn, rpn)
