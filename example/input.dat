@@ -11,8 +11,11 @@ tensor C k l m
 
 # Set bond dimension. Default: 10
 # This line should be written after tensor definitions.
-bond i 5
-bond j 6
+
+## new format (The 1st argument is bond dimension.)
+bond_dim 5 i j
+
+## old format (The last argument is bond dimension.)
 bond k 7
 bond l 8
 bond m 9
@@ -34,11 +37,5 @@ vector v1 m
 # Set the number of space for indent. Default: 4
 #indent 2
 
-# Set time limit. Default 600.0 [sec]
-#time_limit 60.0
-
-# Set interval of info output. Default: 5.0 [sec]
-#info_interval 1.0
-
-# Debug mode
+# Debug mode (Verbose mode)
 #debug

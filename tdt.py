@@ -3,16 +3,16 @@ import sys
 import argparse
 import logging
 import time
-import random
 import config
+import netcon
 
 # Global variables
 TENSOR_NAMES = []
+TENSOR_MATH_NAMES = []
 BOND_NAMES = []
 BOND_DIMS = []
 VECTORS = []
 FINAL_ORDER = None
-INFO_TIME_LIMIT = [False, 0, 0]
 
 class Tensor:
     def __init__(self,name=None,bonds=[]):
@@ -26,6 +26,7 @@ class Tensor:
 
     def __str__(self):
         return str(self.name) + ", " + str(self.bonds)
+
 
 class Bond:
     def __init__(self,t0=-1,t1=-1):
@@ -49,6 +50,7 @@ class Bond:
     def has(self,tensor_index):
         return (self.t0==tensor_index or self.t1==tensor_index)
 
+
 class TensorNetwork:
     def __init__(self):
         self.tensors = []
@@ -56,7 +58,6 @@ class TensorNetwork:
         self.total_memory = 0.0
         self.max_memory = 0.0
         self.cpu_cost = 0.0
-        self.visited_bonds = []
 
     def __str__(self):
         s = ""
@@ -69,17 +70,11 @@ class TensorNetwork:
         return s
 
 
-    def init(self):
-        self.calculate_memory()
-        self.output_log("input")
-
-
     def clone(self):
         tn = TensorNetwork()
         tn.total_memory = self.total_memory
         tn.max_memory = self.max_memory
         tn.cpu_cost = self.cpu_cost
-        tn.visited_bonds = self.visited_bonds[:]
         tn.bonds = [ Bond(b.t0,b.t1) for b in self.bonds ]
         tn.tensors = [ Tensor(t.name,t.bonds) for t in self.tensors ]
         return tn
@@ -91,8 +86,6 @@ class TensorNetwork:
             logging.info(prefix + "tensor{0} : {1} {2}".format(i,TENSOR_NAMES[i],t.bonds))
         for i,b in enumerate(self.bonds):
             logging.info(prefix + "bond{0} : {1} {2} {3}".format(i,BOND_NAMES[i],b,BOND_DIMS[i]))
-        logging.info(prefix + "memory : {0}".format(self.total_memory))
-        logging.info(prefix + "cpu : {0}".format(self.cpu_cost))
 
 
     def add_tensor(self, t_name, b_names):
@@ -112,59 +105,13 @@ class TensorNetwork:
         self.tensors.append(Tensor(t_index,b_indexs))
 
 
-    def clear_visited_bonds(self):
-        self.visited_bonds = [ False ] * len(self.bonds)
-
-
-    def calculate_memory(self):
-        mem = 0.0
-        for t in self.tensors:
-            val = 1.0
-            for b in t.bonds: val *= BOND_DIMS[b]
-            mem += val
-        self.total_memory = mem
-        self.max_memory = mem
-
-
     def find_bonds(self, tensor_a, tensor_b):
-        bonds_a = frozenset(self.tensors[tensor_a].bonds)
-        bonds_b = frozenset(self.tensors[tensor_b].bonds)
-        return list(bonds_a & bonds_b), list(bonds_a - bonds_b), list(bonds_b - bonds_a)
-
-
-    def safe_find_bonds(self, tensor_a, tensor_b):
         bonds_a = self.tensors[tensor_a].bonds
         bonds_b = self.tensors[tensor_b].bonds
         contract = [ b for b in bonds_a if b in bonds_b]
         replaced_a = [ b for b in bonds_a if b not in bonds_b ]
         replaced_b = [ b for b in bonds_b if b not in bonds_a ]
         return contract, replaced_a, replaced_b
-
-
-    def find_bonds_from_bond(self, bond_index):
-        bond = self.bonds[bond_index]
-        return self.find_bonds(bond.t0, bond.t1)
-
-    def calculate_costs(self, bc, br0, br1):
-        """caluculate cpu cost and memory change"""
-        dc = d0 = d1 = 1.0
-        for b in bc: dc *= BOND_DIMS[b]
-        for b in br0: d0 *= BOND_DIMS[b]
-        for b in br1: d1 *= BOND_DIMS[b]
-        cpu = dc*d0*d1
-        mem_add = d0*d1
-        mem_reduce = (d0+d1)*dc
-
-        return cpu, mem_add, mem_reduce
-
-    def judge_contract(self, cpu, mem_add, min_cpu, min_mem):
-        max_memory = max(self.total_memory+mem_add, self.max_memory)
-        cpu_cost = self.cpu_cost + cpu
-
-        # The case that max_memory==min_mem is accept
-        judge = (cpu_cost < min_cpu-0.5) and (max_memory < config.MEMORY_ACCEPTABLE_RATIO*min_mem+0.5)
-
-        return judge
 
 
     def contract(self, t0, t1, bc, br0, br1):
@@ -193,222 +140,42 @@ class TensorNetwork:
             if bonds[b].t0==old_idx: bonds[b].t0=new_idx
             elif bonds[b].t1==old_idx: bonds[b].t1=new_idx
 
-        tn.clear_visited_bonds()
         return tn
 
 
-    def contract_bond(self, bond_index, bc, br0, br1):
-        bond = self.bonds[bond_index]
-        return self.contract(bond.t0, bond.t1, bc, br0, br1)
+def get_memory(tn_orig,rpn):
+    """Caluculate memory cost for contractions from Reverse Polish Notation"""
+    tn = tn_orig.clone()
+    cost = []
+    for item in rpn:
+        if item==-1:
+            c1 = cost.pop()
+            c0 = cost.pop()
 
+            index1 = c1[0]
+            index0 = c0[0]
 
-    def update_costs(self, cpu, mem_add, mem_reduce):
-        # update total memory and cpu cost
-        self.max_memory = max(self.total_memory + mem_add, self.max_memory)
-        self.total_memory += mem_add - mem_reduce
-        self.cpu_cost += cpu
+            t0 = tn.tensors[index0]
+            t1 = tn.tensors[index1]
 
+            bc, br0, br1 = tn.find_bonds(index0, index1)
 
-    def judge_accept(self, min_cpu, min_mem):
-        # judge by cpu cost
-        if self.cpu_cost < min_cpu-0.5: return True
-        elif self.cpu_cost > min_cpu+0.5: return False
+            mem_start = c0[2] + c1[2]
+            mem_end = 1.0
+            for b in br0 + br1: mem_end *= BOND_DIMS[b]
+            mem_req = max(c0[1]+c1[2], c0[1]+c1[3], c0[2]+c1[1], c0[3]+c1[1], mem_end+c0[3]+c1[3])
 
-        # Now cpu cost is same, then check memory usage.
-        if self.max_memory < min_mem-0.5: return True
+            tn = tn.contract(index0, index1, bc, br0, br1)
 
-        return False
+            cost.append( (index0, mem_req, mem_start, mem_end) )
 
-def set_bond_dim(bond_name, dim):
-    BOND_DIMS[ BOND_NAMES.index(bond_name) ] = dim
+        else:
+            t = tn.tensors[item]
+            val = 1.0
+            for b in t.bonds: val *= BOND_DIMS[b]
+            cost.append( (item, val, val, val) ) # (index, mem_req, mem_start, mem_end)
 
-def string_stack(stack):
-    return "".join( [str(s[0]) for s in stack] )
-
-def find_path(tn_orig, script="", min_cpu=sys.float_info.max, min_mem=sys.float_info.max):
-    global INFO_TIME_LIMIT
-    # min_cpu = sys.float_info.max
-    # min_mem = sys.float_info.max
-    max_level=len(tn_orig.tensors)-1
-
-    tn_tree = [[] for i in range(max_level+1)]
-    tn_tree[0] = tn_orig.clone()
-
-    tn_tree[0].clear_visited_bonds()
-
-    stack = []
-    for i,b in enumerate(tn_tree[0].bonds):
-        if not b.isFree(): stack.append((0,i))
-    INFO_TIME_LIMIT[2] = len(stack)
-
-    count = -1
-    count_find = 0
-    start_time = restart_time = time.time()
-
-    while(len(stack)>0):
-        level,bond = stack.pop()
-        tn = tn_tree[level]
-        count += 1
-        log_prefix = "{0} ({1},{2}) ".format(count,level,bond)
-
-        # logging
-        now = time.time()
-        if now-restart_time > config.INFO_INTERVAL:
-            restart_time = now
-            logging.info(log_prefix+"{0} min_cpu={1:.6e} min_mem={2:.6e}".format(
-                string_stack(stack), min_cpu, min_mem))
-        elif config.LOGGING_LEVEL == logging.DEBUG:
-            logging.debug(log_prefix+"{0} min_cpu={1:.6e} min_mem={2:.6e}".format(
-                string_stack(stack), min_cpu, min_mem))
-        if now-start_time > config.TIME_LIMIT:
-            logging.warning(log_prefix+"Stopped by time limit.")
-            INFO_TIME_LIMIT[0] = True
-            INFO_TIME_LIMIT[1] = len([s for s in stack if s[0]==0])+1
-            stack = []
-            continue
-
-
-        # bond is already visited.
-        if tn.visited_bonds[bond]:
-            logging.debug(log_prefix+"Bond is already visited.")
-            continue
-
-        # Get contracted bond, replaced bonds
-        bc, br0, br1 = tn.find_bonds_from_bond(bond)
-
-        # Update visited bonds
-        for b in bc: tn.visited_bonds[b] = True
-
-        # Caluculate cpu cost and memory change
-        cpu, mem_add, mem_reduce = tn.calculate_costs(bc, br0, br1)
-
-        # judge, bc, br0, br1, cpu, mem_add, mem_reduce = tn.judge_contract(bond, min_cpu, min_mem)
-        if not tn.judge_contract(cpu, mem_add, min_cpu, min_mem):
-            logging.debug(log_prefix+"Cut branch.")
-            continue
-
-        # tn_tree[level+1] = tn.contract(bond, bc, br0, br1, cpu, mem_add, mem_reduce)
-        tn_tree[level+1] = tn.contract_bond(bond, bc, br0, br1)
-
-        tn_tree[level+1].update_costs(cpu, mem_add, mem_reduce)
-
-        # all tensors has been contracted
-        if level+1==max_level:
-            tn = tn_tree[level+1]
-            if tn.judge_accept(min_cpu,min_mem):
-                min_cpu = tn.cpu_cost
-                min_mem = tn.max_memory
-                # get script from the name of the contracted tensor
-                for t in tn.tensors:
-                    if not t.name==[]:
-                        script = t.name
-                        break
-                count_find = count
-                logging.info(log_prefix+"Find script={0} cpu={1:.6e} mem={2:.6e}".format(
-                    script, tn.cpu_cost, tn.max_memory))
-            else:
-                logging.debug(log_prefix+"Reject script={0} cpu={1:.6e} mem={2:.6e}".format(
-                    script, tn.cpu_cost, tn.max_memory))
-            continue
-
-        # add inner bonds in the next level into the stack
-        stack.extend( next_items(tn_tree[level+1].bonds,br0,br1,bond,level+1) )
-
-        logging.debug(log_prefix+"Go to the next level. next_bonds={0}".format(
-            len(tn_tree[level+1].bonds)))
-
-    logging.info(log_prefix+"Finish {0}/{1} script={2}".format(count_find, count, script))
-    return script, min_cpu, min_mem
-
-
-def next_items(bonds,br0,br1,bond,next_level):
-    """Create list of inner bonds to be checked in the next level"""
-    # elements in frozenset satisfy  i<bond or (i in br0) or (i in br1)
-    return [ (next_level,i) for i in (frozenset(range(bond) + br0 + br1)) \
-             if not bonds[i].isFree() ]
-
-
-def random_search(tn_orig,iteration):
-    global INFO_TIME_LIMIT
-
-    min_cpu = sys.float_info.max
-    min_mem = sys.float_info.max
-    max_level=len(tn_orig.tensors)-1
-
-    tn_tree = [[] for i in range(max_level+1)]
-    tn_tree[0] = tn_orig.clone()
-    tn_tree[0].clear_visited_bonds()
-
-    script = ""
-    count_find = 0
-    start_time = restart_time = time.time()
-
-    for count in range(iteration):
-        for level in range(max_level):
-            tn = tn_tree[level]
-
-            inner_bonds = []
-            for i,b in enumerate(tn.bonds):
-                if not b.isFree(): inner_bonds.append(i)
-            bond = random.choice(inner_bonds)
-
-            # logging
-            log_prefix = "{0} ({1},{2}) ".format(count,level,bond)
-            now = time.time()
-            if now-restart_time > config.INFO_INTERVAL:
-                restart_time = now
-                logging.info(log_prefix+"min_cpu={0:.6e} min_mem={1:.6e}".format(
-                    min_cpu, min_mem))
-            elif config.LOGGING_LEVEL == logging.DEBUG:
-                logging.debug(log_prefix+"min_cpu={0:.6e} min_mem={1:.6e}".format(
-                    min_cpu, min_mem))
-
-
-            # Get contracted bond, replaced bonds
-            bc, br0, br1 = tn.find_bonds_from_bond(bond)
-
-            # Caluculate cpu cost and memory change
-            cpu, mem_add, mem_reduce = tn.calculate_costs(bc, br0, br1)
-
-            # judge, bc, br0, br1, cpu, mem_add, mem_reduce = tn.judge_contract(bond, min_cpu, min_mem)
-            if not tn.judge_contract(cpu, mem_add, min_cpu, min_mem):
-                logging.debug(log_prefix+"Cut branch.")
-                break
-
-            tn_tree[level+1] = tn.contract_bond(bond, bc, br0, br1)
-            tn_tree[level+1].update_costs(cpu, mem_add, mem_reduce)
-
-            logging.debug(log_prefix+"Go to the next level. next_bonds={0}".format(
-                len(tn_tree[level+1].bonds)))
-
-        # all tensors has been contracted
-        if level+1==max_level:
-            tn = tn_tree[level+1]
-            if tn.judge_accept(min_cpu,min_mem):
-                min_cpu = tn.cpu_cost
-                min_mem = tn.max_memory
-                # get script from the name of the contracted tensor
-                for t in tn.tensors:
-                    if not t.name==[]:
-                        script = t.name
-                        break
-                count_find = count
-                logging.info(log_prefix+"Find script={0} cpu={1:.6e} mem={2:.6e}".format(
-                    script, tn.cpu_cost, tn.max_memory))
-            else:
-                logging.debug(log_prefix+"Reject script={0} cpu={1:.6e} mem={2:.6e}".format(
-                    script, tn.cpu_cost, tn.max_memory))
-
-        if now-start_time > config.TIME_LIMIT:
-            logging.warning(log_prefix+"Stopped by time limit.")
-            INFO_TIME_LIMIT[0] = True
-            INFO_TIME_LIMIT[1] = count
-            INFO_TIME_LIMIT[2] = iteration
-            print INFO_TIME_LIMIT
-            break
-
-    logging.info(log_prefix+"Finish {0}/{1} script={2}".format(count_find, count, script))
-    return script, min_cpu, min_mem
+    return cost[0][1]
 
 
 def get_math(rpn):
@@ -422,8 +189,9 @@ def get_math(rpn):
             stack.append( new_name )
 
         else:
-            stack.append(TENSOR_NAMES[c])
+            stack.append(TENSOR_MATH_NAMES[c])
     return stack[0]
+
 
 def get_script(tn_orig,rpn):
     """Generate tensordot script from Reverse Polish Notation"""
@@ -440,7 +208,7 @@ def get_script(tn_orig,rpn):
             t0 = tn.tensors[index0]
             t1 = tn.tensors[index1]
 
-            bc, br0, br1 = tn.safe_find_bonds(index0, index1)
+            bc, br0, br1 = tn.find_bonds(index0, index1)
 
             axes0 = [ t0.bonds.index(b) for b in bc]
             axes1 = [ t1.bonds.index(b) for b in bc]
@@ -517,7 +285,11 @@ def multiply_vector_script(name,vec_list,rank):
             arg.append(vec_name)
             arg.append(str(axis))
         script = name + ".multiply_vector(" + ",".join(arg)+ ")"
-    return script
+
+    math = "("+name
+    for axis,vec_name in vec_list: math += "*"+vec_name
+    math += ")"
+    return script, math
 
 
 def add_transpose(tn,script,bond_order):
@@ -534,93 +306,6 @@ def add_transpose(tn,script,bond_order):
 
     axes = [ bond_order.index(b) for b in f_order ]
     return transpose_script(script,axes), f_order
-
-
-def set_style(style):
-    if style=="numpy":
-        config.STYLE = "numpy"
-        config.COMMENT_PREFIX = "#"
-    elif style=="mptensor":
-        config.STYLE = "mptensor"
-        config.COMMENT_PREFIX = "//"
-
-def set_time_limit(time_limit):
-    if time_limit is None:
-        pass
-    elif time_limit>0.0:
-        config.TIME_LIMIT = time_limit
-    else:
-        config.TIME_LIMIT = sys.float_info.max
-
-def read_file(infile, tn):
-    """Read input file"""
-    global FINAL_ORDER
-
-    for line in infile:
-        data = line.split()
-        if data==[]: continue
-
-        command = data[0].lower()
-        if command=="style":
-            set_style(data[1].lower())
-        elif command=="numpy":
-            config.NUMPY = data[1]
-        elif command=="indent":
-            config.INDENT = " " * int(data[1])
-        elif command=="time_limit":
-            config.TIME_LIMIT = float(data[1])
-        elif command=="info_interval":
-            config.INFO_INTERVAL = float(data[1])
-        elif command=="default_dimension":
-            # Should be set the top of input file.
-            config.DEFAULT_BOND_DIM = int(data[1])
-        elif command=="memory_acceptable_ratio":
-            config.MEMORY_ACCEPTABLE_RATIO = max(float(data[1]), 1.0)
-        elif command=="debug":
-            config.LOGGING_LEVEL = logging.DEBUG
-
-        elif command=="tensor":
-            tn.add_tensor(data[1], data[2:])
-        elif command=="bond":
-            for b in data[1:-1]: set_bond_dim(b, int(data[-1]))
-        elif command=="bond_dim":
-            for b in data[2:]: set_bond_dim(b, int(data[1]))
-        elif command=="order":
-            FINAL_ORDER = data[1:]
-        elif command=="vector":
-            VECTORS.append((data[1], data[2]))
-    infile.close()
-
-
-def output_result(outfile,script,math_script,cpu,mem,final_bonds,input_file):
-    BR = "\n"
-    SP = " "
-    output = [config.COMMENT_PREFIX*30,
-              config.COMMENT_PREFIX + SP + input_file,
-              config.COMMENT_PREFIX*30,
-              config.COMMENT_PREFIX + SP + math_script,
-              config.COMMENT_PREFIX + SP + "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem),
-              config.COMMENT_PREFIX + SP + "final_bond_order " + final_bonds,
-              config.COMMENT_PREFIX*30]
-    if INFO_TIME_LIMIT[0]:
-        num, den = (INFO_TIME_LIMIT[2]-INFO_TIME_LIMIT[1]), INFO_TIME_LIMIT[2]
-        ratio = 100.0*num/den
-        info = "{0:3.2f}% ({1:d}/{2:d})".format(ratio,num,den)
-        output += [config.COMMENT_PREFIX + SP + "Stopped by time limit. " + info + " was finished.",
-                   config.COMMENT_PREFIX*30]
-    output += script
-    outfile.write(BR.join(output) + BR)
-
-
-def check_bond_order(tn):
-    return FINAL_ORDER == None or \
-        frozenset(FINAL_ORDER) == frozenset( BOND_NAMES[i] for i,b in enumerate(tn.bonds) if b.isFree() )
-
-
-def check_vector():
-    for v in VECTORS:
-        if v[1] not in BOND_NAMES: return False
-    return True
 
 
 def add_multiply_vector(tn):
@@ -643,17 +328,110 @@ def add_multiply_vector(tn):
             t = max(t0, t1)
         axis = tn.tensors[t].bonds.index(b_index)
         mod_list[t].append((axis,v_name))
-        logging.info("vector : "+v_name+" on bond"+str(b_index)+" -> tensor"+str(t))
+        logging.debug("vector: "+v_name+" on bond"+str(b_index)+" -> tensor"+str(t))
 
     for i,l in enumerate(mod_list):
         if len(l)==0: continue
         rank = len(tn.tensors[i].bonds)
-        new_name = multiply_vector_script(TENSOR_NAMES[i],sorted(l),rank)
-        logging.info("vector : "+TENSOR_NAMES[i]+" -> "+new_name)
+        new_name, new_math = multiply_vector_script(TENSOR_NAMES[i],sorted(l),rank)
+        logging.info("vector: "+TENSOR_NAMES[i]+" -> "+new_math)
         TENSOR_NAMES[i] = new_name
+        TENSOR_MATH_NAMES[i] = new_math
 
 
-def main(args,rand_flag=False):
+def read_file(infile, tn):
+    """Read input file"""
+    global FINAL_ORDER
+
+    for line in infile:
+        data = line.split()
+        if data==[]: continue
+
+        command = data[0].lower()
+        if command=="style":
+            set_style(data[1].lower())
+        elif command=="numpy":
+            config.NUMPY = data[1]
+        elif command=="indent":
+            config.INDENT = " " * int(data[1])
+        elif command=="default_dimension":
+            # Should be set the top of input file.
+            config.DEFAULT_BOND_DIM = int(data[1])
+        elif command=="debug" or command=="verbose":
+            config.LOGGING_LEVEL = logging.DEBUG
+
+        elif command=="tensor":
+            tn.add_tensor(data[1], data[2:])
+        elif command=="bond":
+            for b in data[1:-1]: set_bond_dim(b, int(data[-1]))
+        elif command=="bond_dim":
+            for b in data[2:]: set_bond_dim(b, int(data[1]))
+        elif command=="order":
+            FINAL_ORDER = data[1:]
+        elif command=="vector":
+            VECTORS.append((data[1], data[2]))
+    infile.close()
+
+
+def set_bond_dim(bond_name, dim):
+    BOND_DIMS[ BOND_NAMES.index(bond_name) ] = dim
+
+
+def set_style(style):
+    if style=="numpy":
+        config.STYLE = "numpy"
+        config.COMMENT_PREFIX = "#"
+    elif style=="mptensor":
+        config.STYLE = "mptensor"
+        config.COMMENT_PREFIX = "//"
+
+
+def check_bond_order(tn):
+    return FINAL_ORDER == None or \
+        frozenset(FINAL_ORDER) == frozenset( BOND_NAMES[i] for i,b in enumerate(tn.bonds) if b.isFree() )
+
+
+def check_vector():
+    for v in VECTORS:
+        if v[1] not in BOND_NAMES: return False
+    return True
+
+
+def output_result(outfile,script,math_script,cpu,mem,bond_order,input_file):
+    final_bonds = "(" + ", ".join([BOND_NAMES[b] for b in bond_order]) + ")"
+    BR = "\n"
+    SP = " "
+    output = [config.COMMENT_PREFIX*30,
+              config.COMMENT_PREFIX + SP + input_file,
+              config.COMMENT_PREFIX*30,
+              config.COMMENT_PREFIX + SP + math_script,
+              config.COMMENT_PREFIX + SP + "cpu_cost= {0:g}  memory= {1:g}".format(cpu, mem),
+              config.COMMENT_PREFIX + SP + "final_bond_order " + final_bonds,
+              config.COMMENT_PREFIX*30]
+    output += script
+    outfile.write(BR.join(output) + BR)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Code generator for tensor contruction")
+    parser.add_argument('-s', metavar='style', dest='style',
+                        type=str, default=None,
+                        choices=['numpy', 'mptensor'],
+                        help='set output style ("numpy" or "mptensor")')
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help='verbose mode')
+    parser.add_argument('-o', metavar='outfile', dest='outfile',
+                        type=argparse.FileType('w'), default=sys.stdout,
+                        help='write the result to outfile')
+    parser.add_argument('infile',
+                        type=argparse.FileType('r'),
+                        help='tensor-network definition file')
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
     tn = TensorNetwork()
 
     # Read input file
@@ -661,7 +439,8 @@ def main(args,rand_flag=False):
 
     # Overwrite by command-line option
     set_style(args.style)
-    set_time_limit(args.time_limit)
+    if args.verbose:
+        config.LOGGING_LEVEL = logging.DEBUG
 
     assert len(tn.tensors)>0, "No tensor."
     assert len(tn.bonds)>0, "No bond."
@@ -669,52 +448,15 @@ def main(args,rand_flag=False):
     assert check_vector(), "Vectors will be put on non-existent bond."
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
-    tn.init()
+    tn.output_log("input")
+    rpn, cpu = netcon.netcon(tn, BOND_DIMS)
+    mem = get_memory(tn, rpn)
 
-    if rand_flag:
-        rpn, cpu, mem = random_search(tn, max(1,args.iteration))
-    else:
-        if args.iter_pre>0:
-            rpn, cpu, mem = random_search(tn, args.iter_pre)
-            rpn, cpu, mem = find_path(tn, rpn, cpu, mem)
-        else:
-            rpn, cpu, mem = find_path(tn)
-
+    TENSOR_MATH_NAMES = TENSOR_NAMES[:]
     add_multiply_vector(tn)
     script, bond_order = get_script(tn, rpn)
     script, bond_order = add_transpose(tn, script, bond_order)
 
-    final_bonds = "(" + ", ".join([BOND_NAMES[b] for b in bond_order]) + ")"
-
     output_result(args.outfile,
-                  script,get_math(rpn),cpu,mem,final_bonds,
+                  script,get_math(rpn),cpu,mem,bond_order,
                   args.infile.name)
-
-    if INFO_TIME_LIMIT[0]: sys.exit("Stopped by time limit.")
-
-
-def add_default_arguments(parser):
-    parser.add_argument('-s', metavar='style', dest='style',
-                        type=str, default=None,
-                        choices=['numpy', 'mptensor'],
-                        help='set output style ("numpy" or "mptensor")')
-    parser.add_argument('-t', metavar='time_limit', dest='time_limit',
-                        type=float, default=None,
-                        help='set time limit [sec]')
-    parser.add_argument('-o', metavar='outfile', dest='outfile',
-                        type=argparse.FileType('w'), default=sys.stdout,
-                        help='write the result to outfile')
-    parser.add_argument('infile',
-                        type=argparse.FileType('r'),
-                        help='tensor-network definition file')
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Code generator for tensor contruction")
-    add_default_arguments(parser)
-    parser.add_argument('-r', metavar='iter_pre', dest='iter_pre',
-                        type=int, default=0,
-                        help='set the number of random pre-search iterations (default: 0)')
-    args = parser.parse_args()
-
-    main(args)
