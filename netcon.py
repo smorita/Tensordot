@@ -59,7 +59,7 @@ def netcon(tn, bond_dims):
         logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
         mu_next = sys.float_info.max
         for c in range(1,n):
-            for d1 in range((c+1)/2):
+            for d1 in range((c+1)//2):
                 d2 = c-d1-1
                 n1 = len(tensor_set[d1])
                 n2 = len(tensor_set[d2])
@@ -144,5 +144,5 @@ def _print_tset(tensor_set):
     """Print tensor_set. (for debug)"""
     for level in range(len(tensor_set)):
         for i,t in enumerate(tensor_set[level]):
-            print level,i,t
+            print(level,i,t)
 
