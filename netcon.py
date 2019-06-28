@@ -61,7 +61,7 @@ class NetconClass:
         n = len(self.prime_tensors)
         xi_min = float(min(self.BOND_DIMS))
         mu_cap = 1.0
-        mu_old = 0.0 #>=0
+        prev_mu_cap = 0.0 #>=0
 
         while len(tensors_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
@@ -81,7 +81,7 @@ class NetconClass:
                                 pass
                             elif mu_cap < mu:
                                 next_mu_cap = mu
-                            elif t1.is_new or t2.is_new or mu_old < mu:
+                            elif t1.is_new or t2.is_new or prev_mu_cap < mu:
                                 t_new = self.contract(t1,t2)
                                 is_find = False
                                 for i,t_old in enumerate(tensors_of_size[c]):
@@ -91,7 +91,7 @@ class NetconClass:
                                         is_find = True
                                         break
                                 if not is_find: tensors_of_size[c].append(t_new)
-            mu_old = mu_cap
+            prev_mu_cap = mu_cap
             mu_cap = max(next_mu_cap, mu_cap*xi_min)
             for s in tensors_of_size:
                 for t in s: t.is_new = False
