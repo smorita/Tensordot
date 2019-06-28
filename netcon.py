@@ -77,9 +77,11 @@ class NetconClass:
 
                             mu = self.get_contracting_cost(t1,t2)
 
-                            assert mu_cap <= next_mu_cap
-                            if mu_cap < mu < next_mu_cap: next_mu_cap = mu
-                            if (t1.is_new or t2.is_new or mu_old < mu) and (mu <= mu_cap):
+                            if next_mu_cap <= mu:
+                                pass
+                            elif mu_cap < mu:
+                                next_mu_cap = mu
+                            elif t1.is_new or t2.is_new or mu_old < mu:
                                 t_new = self.contract(t1,t2)
                                 is_find = False
                                 for i,t_old in enumerate(tensors_of_size[c]):
