@@ -40,8 +40,8 @@ class HistTensorFrame:
 
 
 class NetconClass:
-    def __init__(self, tn, bond_dims):
-        self.tn = tn
+    def __init__(self, tensors, bond_dims):
+        self.tensors = tensors
         self.BOND_DIMS = bond_dims[:]
 
     def calc(self):
@@ -107,8 +107,8 @@ class NetconClass:
 
     def _init_tensor_set(self):
         """Initialize a set of tensors from tdt tensor-network."""
-        tensor_set = [[] for t in self.tn.tensors]
-        for t in self.tn.tensors:
+        tensor_set = [[] for t in self.tensors]
+        for t in self.tensors:
             rpn = t.name
             bits = 0
             for i in rpn:
