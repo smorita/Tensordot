@@ -71,7 +71,7 @@ class NetconClass:
                     d2 = c-d1
                     for i1, t1 in enumerate(tensors_of_size[d1]):
                         i2_start = i1+1 if d1==d2 else 0
-                        for i2, t2 in enumerate(tensors_of_size[d2][i2_start:]):
+                        for t2 in tensors_of_size[d2][i2_start:]:
                             if self._is_disjoint(t1,t2): continue
                             if self._is_overlap(t1,t2): continue
 
