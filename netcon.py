@@ -77,7 +77,7 @@ class NetconClass:
 
                             mu = self._get_cost(t1,t2)
 
-                            if (mu > mu_cap) and (mu < mu_next): mu_next = mu
+                            if mu_cap < mu < mu_next: mu_next = mu
                             if (t1.is_new or t2.is_new or mu_old < mu) and (mu <= mu_cap):
                                 t_new = self._contract(t1,t2)
                                 is_find = False
