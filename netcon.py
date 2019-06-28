@@ -13,13 +13,13 @@ import time
 import config
 
 
-class Tensor:
+class HistTensorFrame:
     """Tensor class for netcon.
 
     Attributes:
         rpn: contraction sequence with reverse polish notation.
         bits: bits representation of contracted tensors.
-        bonds: list of bonds connecting with the outside.
+        bonds: list of uncontracted bonds.
         is_new: a flag.
     """
 
@@ -31,7 +31,7 @@ class Tensor:
         self.is_new = is_new
 
     def __repr__(self):
-        return "Tensor({0}, bonds={1}, cost={2:.6e}, bits={3}, is_new={4})".format(
+        return "HistTensorFrame({0}, bonds={1}, cost={2:.6e}, bits={3}, is_new={4})".format(
             self.rpn, self.bonds, self.cost, self.bits, self.is_new)
 
     def __str__(self):
@@ -63,7 +63,6 @@ class NetconClass:
         mu_old = 0.0
 
         while len(tensor_set[-1])<1:
-            print(tensor_set)
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             mu_next = sys.float_info.max
             for c in range(1,n):
@@ -102,6 +101,7 @@ class NetconClass:
             logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensor_set]))
 
         t_final = tensor_set[-1][0]
+        print(t_final.rpn)
         return t_final.rpn, t_final.cost
 
 
@@ -115,7 +115,7 @@ class NetconClass:
                 if i>=0: bits += (1<<i)
             bonds = frozenset(t.bonds)
             cost = 0.0
-            tensor_set[0].append(Tensor(rpn,bits,bonds,cost))
+            tensor_set[0].append(HistTensorFrame(rpn,bits,bonds,cost))
         return tensor_set
 
 
@@ -135,7 +135,7 @@ class NetconClass:
         bits = t1.bits ^ t2.bits # XOR
         bonds = frozenset(t1.bonds ^ t2.bonds)
         cost = self._get_cost(t1,t2)
-        return Tensor(rpn,bits,bonds,cost)
+        return HistTensorFrame(rpn,bits,bonds,cost)
 
 
     def _is_disjoint(self,t1,t2):
