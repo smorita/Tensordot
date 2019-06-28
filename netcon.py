@@ -40,9 +40,9 @@ class HistTensorFrame:
 
 
 class NetconClass:
-    def __init__(self, tensors, bond_dims):
+    def __init__(self, prime_tensors, bond_dims):
         #print(tensors)
-        self.tensors = tensors
+        self.prime_tensors = prime_tensors
         self.BOND_DIMS = bond_dims[:]
 
     def calc(self):
@@ -108,8 +108,8 @@ class NetconClass:
 
     def _init_tensors_of_size_plus1(self):
         """tensors_of_size_plus1[k] == calculated tensors which is contraction of k+1 prime tensors"""
-        tensors_of_size_plus1 = [[] for t in self.tensors]
-        for t in self.tensors:
+        tensors_of_size_plus1 = [[] for t in self.prime_tensors]
+        for t in self.prime_tensors:
             rpn = t.name
             bits = 0
             for i in rpn:
