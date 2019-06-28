@@ -14,7 +14,7 @@ import config
 import itertools
 
 
-class HistTensorFrame:
+class TensorFrame:
     """Tensor class for netcon.
 
     Attributes:
@@ -32,7 +32,7 @@ class HistTensorFrame:
         self.is_new = is_new
 
     def __repr__(self):
-        return "HistTensorFrame({0}, bonds={1}, cost={2:.6e}, bits={3}, is_new={4})".format(
+        return "TensorFrame({0}, bonds={1}, cost={2:.6e}, bits={3}, is_new={4})".format(
             self.rpn, self.bonds, self.cost, self.bits, self.is_new)
 
     def __str__(self):
@@ -40,12 +40,12 @@ class HistTensorFrame:
             self.rpn, self.bonds, self.cost, self.bits, self.is_new)
 
 
-class NetconClass:
+class NetconOptimizer:
     def __init__(self, prime_tensors, bond_dims):
         self.prime_tensors = prime_tensors
         self.BOND_DIMS = bond_dims[:]
 
-    def calc(self):
+    def optimize(self):
         """Find optimal contraction sequence.
 
         Args:
@@ -106,7 +106,7 @@ class NetconClass:
                 if i>=0: bits += (1<<i)
             bonds = frozenset(t.bonds)
             cost = 0.0
-            tensordict_of_size[1].update({bits:HistTensorFrame(rpn,bits,bonds,cost)})
+            tensordict_of_size[1].update({bits:TensorFrame(rpn,bits,bonds,cost)})
         return tensordict_of_size
 
 
@@ -126,7 +126,7 @@ class NetconClass:
         bits = t1.bits ^ t2.bits # XOR
         bonds = frozenset(t1.bonds ^ t2.bonds)
         cost = self.get_contracting_cost(t1,t2)
-        return HistTensorFrame(rpn,bits,bonds,cost)
+        return TensorFrame(rpn,bits,bonds,cost)
 
 
     def are_direct_product(self,t1,t2):
