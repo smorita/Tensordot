@@ -65,7 +65,7 @@ class NetconClass:
 
         while len(tensors_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
-            mu_next = sys.float_info.max
+            next_mu_cap = sys.float_info.max
             for c in range(2,n+1):
                 for d1 in range(1,c//2+1):
                     d2 = c-d1
@@ -77,7 +77,8 @@ class NetconClass:
 
                             mu = self.get_contracting_cost(t1,t2)
 
-                            if mu_cap < mu < mu_next: mu_next = mu
+                            assert mu_cap <= next_mu_cap
+                            if mu_cap < mu < next_mu_cap: next_mu_cap = mu
                             if (t1.is_new or t2.is_new or mu_old < mu) and (mu <= mu_cap):
                                 t_new = self.contract(t1,t2)
                                 is_find = False
@@ -89,7 +90,7 @@ class NetconClass:
                                         break
                                 if not is_find: tensors_of_size[c].append(t_new)
             mu_old = mu_cap
-            mu_cap = max(mu_next, mu_cap*xi_min)
+            mu_cap = max(next_mu_cap, mu_cap*xi_min)
             for s in tensors_of_size:
                 for t in s: t.is_new = False
 
