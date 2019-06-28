@@ -11,6 +11,7 @@ import sys
 import logging
 import time
 import config
+import itertools
 
 
 class HistTensorFrame:
@@ -69,28 +70,27 @@ class NetconClass:
             for c in range(2,n+1):
                 for d1 in range(1,c//2+1):
                     d2 = c-d1
-                    for i1, t1 in enumerate(tensors_of_size[d1]):
-                        i2_start = i1+1 if d1==d2 else 0
-                        for t2 in tensors_of_size[d2][i2_start:]:
-                            if self.are_overlap(t1,t2): continue
-                            if self.are_direct_product(t1,t2): continue
+                    t1_t2_iterator = itertools.combinations(tensors_of_size[d1], 2) if d1==d2 else itertools.product(tensors_of_size[d1], tensors_of_size[d2])
+                    for t1, t2 in t1_t2_iterator:
+                        if self.are_overlap(t1,t2): continue
+                        if self.are_direct_product(t1,t2): continue
 
-                            mu = self.get_contracting_cost(t1,t2)
+                        mu = self.get_contracting_cost(t1,t2)
 
-                            if next_mu_cap <= mu:
-                                pass
-                            elif mu_cap < mu:
-                                next_mu_cap = mu
-                            elif t1.is_new or t2.is_new or prev_mu_cap < mu:
-                                t_new = self.contract(t1,t2)
-                                is_find = False
-                                for i,t_old in enumerate(tensors_of_size[c]):
-                                    if t_new.bits == t_old.bits:
-                                        if t_new.cost < t_old.cost:
-                                            tensors_of_size[c][i] = t_new
-                                        is_find = True
-                                        break
-                                if not is_find: tensors_of_size[c].append(t_new)
+                        if next_mu_cap <= mu:
+                            pass
+                        elif mu_cap < mu:
+                            next_mu_cap = mu
+                        elif t1.is_new or t2.is_new or prev_mu_cap < mu:
+                            t_new = self.contract(t1,t2)
+                            is_find = False
+                            for i,t_old in enumerate(tensors_of_size[c]):
+                                if t_new.bits == t_old.bits:
+                                    if t_new.cost < t_old.cost:
+                                        tensors_of_size[c][i] = t_new
+                                    is_find = True
+                                    break
+                            if not is_find: tensors_of_size[c].append(t_new)
             prev_mu_cap = mu_cap
             mu_cap = max(next_mu_cap, mu_cap*xi_min)
             for s in tensors_of_size:
