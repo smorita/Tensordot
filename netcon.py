@@ -30,9 +30,13 @@ class Tensor:
         self.cost = cost
         self.is_new = is_new
 
+    def __repr__(self):
+        return "Tensor({0}, bonds={1}, cost={2:.6e}, bit={3}, is_new={4})".format(
+            self.rpn, self.bonds, self.cost, self.bit, self.is_new)
+
     def __str__(self):
-        return "{0} : bond={1} cost={2:.6e} bit={3}  new={4}".format(
-            self.rpn, list(self.bonds), self.cost, self.bit, self.is_new)
+        return "{0} : bond={1} cost={2:.6e} bit={3} new={4}".format(
+            self.rpn, self.bonds, self.cost, self.bit, self.is_new)
 
 
 class NetconClass:
@@ -59,6 +63,7 @@ class NetconClass:
         mu_old = 0.0
 
         while len(tensor_set[-1])<1:
+            #print(tensor_set)
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             mu_next = sys.float_info.max
             for c in range(1,n):
