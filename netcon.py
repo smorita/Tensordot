@@ -70,8 +70,7 @@ class NetconClass:
                 cp1 = c+1
                 for d1 in range((c+1)//2):
                     d1p1 = d1+1
-                    d2 = c-d1p1
-                    d2p1 = d2+1
+                    d2p1 = cp1-d1p1
                     n1 = len(tensors_of_size[d1p1])
                     n2 = len(tensors_of_size[d2p1])
                     for i1 in range(n1):
