@@ -18,25 +18,25 @@ class Tensor:
 
     Attributes:
         rpn: contraction sequence with reverse polish notation.
-        bit: bit representation of contracted tensors.
+        bits: bits representation of contracted tensors.
         bonds: list of bonds connecting with the outside.
         is_new: a flag.
     """
 
-    def __init__(self,rpn=[],bit=0,bonds=[],cost=0.0,is_new=True):
+    def __init__(self,rpn=[],bits=0,bonds=[],cost=0.0,is_new=True):
         self.rpn = rpn[:]
-        self.bit = bit
+        self.bits = bits
         self.bonds = bonds
         self.cost = cost
         self.is_new = is_new
 
     def __repr__(self):
-        return "Tensor({0}, bonds={1}, cost={2:.6e}, bit={3}, is_new={4})".format(
-            self.rpn, self.bonds, self.cost, self.bit, self.is_new)
+        return "Tensor({0}, bonds={1}, cost={2:.6e}, bits={3}, is_new={4})".format(
+            self.rpn, self.bonds, self.cost, self.bits, self.is_new)
 
     def __str__(self):
-        return "{0} : bond={1} cost={2:.6e} bit={3} new={4}".format(
-            self.rpn, self.bonds, self.cost, self.bit, self.is_new)
+        return "{0} : bonds={1} cost={2:.6e} bits={3} new={4}".format(
+            self.rpn, self.bonds, self.cost, self.bits, self.is_new)
 
 
 class NetconClass:
@@ -63,7 +63,7 @@ class NetconClass:
         mu_old = 0.0
 
         while len(tensor_set[-1])<1:
-            #print(tensor_set)
+            print(tensor_set)
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             mu_next = sys.float_info.max
             for c in range(1,n):
@@ -88,7 +88,7 @@ class NetconClass:
                                 t_new = self._contract(t1,t2)
                                 is_find = False
                                 for i,t_old in enumerate(tensor_set[c]):
-                                    if t_new.bit == t_old.bit:
+                                    if t_new.bits == t_old.bits:
                                         if t_new.cost < t_old.cost:
                                             tensor_set[c][i] = t_new
                                         is_find = True
@@ -110,12 +110,12 @@ class NetconClass:
         tensor_set = [[] for t in self.tn.tensors]
         for t in self.tn.tensors:
             rpn = t.name
-            bit = 0
+            bits = 0
             for i in rpn:
-                if i>=0: bit += (1<<i)
+                if i>=0: bits += (1<<i)
             bonds = frozenset(t.bonds)
             cost = 0.0
-            tensor_set[0].append(Tensor(rpn,bit,bonds,cost))
+            tensor_set[0].append(Tensor(rpn,bits,bonds,cost))
         return tensor_set
 
 
@@ -132,10 +132,10 @@ class NetconClass:
         """Return a contracted tensor"""
         assert (not self._is_disjoint(t1,t2))
         rpn = t1.rpn + t2.rpn + [-1]
-        bit = t1.bit ^ t2.bit # XOR
+        bits = t1.bits ^ t2.bits # XOR
         bonds = frozenset(t1.bonds ^ t2.bonds)
         cost = self._get_cost(t1,t2)
-        return Tensor(rpn,bit,bonds,cost)
+        return Tensor(rpn,bits,bonds,cost)
 
 
     def _is_disjoint(self,t1,t2):
@@ -145,7 +145,7 @@ class NetconClass:
 
     def _is_overlap(self,t1,t2):
         """Check if two tensors have the same basic tensor."""
-        return (t1.bit & t2.bit)>0
+        return (t1.bits & t2.bits)>0
 
 
     def _print_tset(self,tensor_set):
