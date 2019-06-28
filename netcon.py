@@ -74,19 +74,17 @@ class NetconClass:
                         if self.are_overlap(t1,t2): continue
                         if self.are_direct_product(t1,t2): continue
 
-                        mu = self.get_contracting_cost(t1,t2)
+                        cost = self.get_contracting_cost(t1,t2)
+                        bits = t1.bits ^ t2.bits
 
-                        if next_mu_cap <= mu:
+                        if next_mu_cap <= cost:
                             pass
-                        elif mu_cap < mu:
-                            next_mu_cap = mu
-                        elif t1.is_new or t2.is_new or prev_mu_cap < mu:
-                            t_new = self.contract(t1,t2)
-                            t_old = tensordict_of_size[c].get(t_new.bits)
-                            if t_old is not None and t_new.cost < t_old.cost:
-                                tensordict_of_size[c][t_new.bits] = t_new
-                            else:
-                                tensordict_of_size[c][t_new.bits] = t_new
+                        elif mu_cap < cost:
+                            next_mu_cap = cost
+                        elif t1.is_new or t2.is_new or prev_mu_cap < cost:
+                            t_old = tensordict_of_size[c].get(bits)
+                            if t_old is None or cost < t_old.cost:
+                                tensordict_of_size[c][bits] = self.contract(t1,t2)
             prev_mu_cap = mu_cap
             mu_cap = max(next_mu_cap, mu_cap*xi_min)
             for s in tensordict_of_size:
