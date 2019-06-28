@@ -449,7 +449,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
     tn.output_log("input")
-    rpn, cpu = netcon.netcon(tn, BOND_DIMS)
+    rpn, cpu = netcon.NetconClass(tn, BOND_DIMS).calc()
     mem = get_memory(tn, rpn)
 
     TENSOR_MATH_NAMES = TENSOR_NAMES[:]
