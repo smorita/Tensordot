@@ -42,7 +42,6 @@ class HistTensorFrame:
 
 class NetconClass:
     def __init__(self, prime_tensors, bond_dims):
-        #print(tensors)
         self.prime_tensors = prime_tensors
         self.BOND_DIMS = bond_dims[:]
 
@@ -96,7 +95,6 @@ class NetconClass:
             logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensordict_of_size]))
 
         t_final = tensordict_of_size[-1][(1<<n)-1]
-        #print(t_final.rpn)
         return t_final.rpn, t_final.cost
 
 
