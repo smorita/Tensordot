@@ -69,14 +69,9 @@ class NetconClass:
             for c in range(2,n+1):
                 for d1 in range(1,c//2+1):
                     d2 = c-d1
-                    n1 = len(tensors_of_size[d1])
-                    n2 = len(tensors_of_size[d2])
-                    for i1 in range(n1):
+                    for i1, t1 in enumerate(tensors_of_size[d1]):
                         i2_start = i1+1 if d1==d2 else 0
-                        for i2 in range(i2_start, n2):
-                            t1 = tensors_of_size[d1][i1]
-                            t2 = tensors_of_size[d2][i2]
-
+                        for i2, t2 in enumerate(tensors_of_size[d2][i2_start:]):
                             if self._is_disjoint(t1,t2): continue
                             if self._is_overlap(t1,t2): continue
 
