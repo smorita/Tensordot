@@ -51,7 +51,7 @@ class NetconClass:
             rpn: Optimal contraction sequence with reverse polish notation.
             cost: Total contraction cost.
         """
-        tensor_set = self._init(self.tn)
+        tensor_set = self._init_tensor_set()
 
         n = len(tensor_set[0])
         xi_min = float(min(self.BOND_DIMS))
@@ -100,10 +100,10 @@ class NetconClass:
         return t_final.rpn, t_final.cost
 
 
-    def _init(self,tn):
+    def _init_tensor_set(self):
         """Initialize a set of tensors from tdt tensor-network."""
-        tensor_set = [[] for t in tn.tensors]
-        for t in tn.tensors:
+        tensor_set = [[] for t in self.tn.tensors]
+        for t in self.tn.tensors:
             rpn = t.name
             bit = 0
             for i in rpn:
