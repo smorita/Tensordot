@@ -56,7 +56,7 @@ class NetconClass:
             rpn: Optimal contraction sequence with reverse polish notation.
             cost: Total contraction cost.
         """
-        tensors_of_size = self._init_tensors_of_size()
+        tensors_of_size = self.init_tensors_of_size()
 
         n = len(self.prime_tensors)
         xi_min = float(min(self.BOND_DIMS))
@@ -72,14 +72,14 @@ class NetconClass:
                     for i1, t1 in enumerate(tensors_of_size[d1]):
                         i2_start = i1+1 if d1==d2 else 0
                         for t2 in tensors_of_size[d2][i2_start:]:
-                            if self._is_overlap(t1,t2): continue
-                            if self._is_disjoint(t1,t2): continue
+                            if self.are_overlap(t1,t2): continue
+                            if self.are_direct_product(t1,t2): continue
 
-                            mu = self._get_cost(t1,t2)
+                            mu = self.get_contracting_cost(t1,t2)
 
                             if mu_cap < mu < mu_next: mu_next = mu
                             if (t1.is_new or t2.is_new or mu_old < mu) and (mu <= mu_cap):
-                                t_new = self._contract(t1,t2)
+                                t_new = self.contract(t1,t2)
                                 is_find = False
                                 for i,t_old in enumerate(tensors_of_size[c]):
                                     if t_new.bits == t_old.bits:
@@ -100,7 +100,7 @@ class NetconClass:
         return t_final.rpn, t_final.cost
 
 
-    def _init_tensors_of_size(self):
+    def init_tensors_of_size(self):
         """tensors_of_size[k] == calculated tensors which is contraction of k+1 prime tensors"""
         tensors_of_size = [[] for size in range(len(self.prime_tensors)+1)]
         for t in self.prime_tensors:
@@ -114,7 +114,7 @@ class NetconClass:
         return tensors_of_size
 
 
-    def _get_cost(self,t1,t2):
+    def get_contracting_cost(self,t1,t2):
         """Get the cost of contraction of two tensors."""
         cost = 1.0
         for b in (t1.bonds | t2.bonds):
@@ -123,27 +123,27 @@ class NetconClass:
         return cost
 
 
-    def _contract(self,t1,t2):
+    def contract(self,t1,t2):
         """Return a contracted tensor"""
-        assert (not self._is_disjoint(t1,t2))
+        assert (not self.are_direct_product(t1,t2))
         rpn = t1.rpn + t2.rpn + [-1]
         bits = t1.bits ^ t2.bits # XOR
         bonds = frozenset(t1.bonds ^ t2.bonds)
-        cost = self._get_cost(t1,t2)
+        cost = self.get_contracting_cost(t1,t2)
         return HistTensorFrame(rpn,bits,bonds,cost)
 
 
-    def _is_disjoint(self,t1,t2):
+    def are_direct_product(self,t1,t2):
         """Check if two tensors are disjoint."""
         return (t1.bonds).isdisjoint(t2.bonds)
 
 
-    def _is_overlap(self,t1,t2):
+    def are_overlap(self,t1,t2):
         """Check if two tensors have the same basic tensor."""
         return (t1.bits & t2.bits)>0
 
 
-    def _print_tset(self,tensors_of_size):
+    def print_tset(self,tensors_of_size):
         """Print tensors_of_size. (for debug)"""
         for level in range(len(tensors_of_size)):
             for i,t in enumerate(tensors_of_size[level]):
