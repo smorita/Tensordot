@@ -66,8 +66,7 @@ class NetconClass:
         while len(tensors_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             mu_next = sys.float_info.max
-            for c in range(1,n):
-                cp1 = c+1
+            for cp1 in range(2,n+1):
                 for d1p1 in range(1,(cp1)//2+1):
                     d2p1 = cp1-d1p1
                     n1 = len(tensors_of_size[d1p1])
