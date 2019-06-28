@@ -68,8 +68,7 @@ class NetconClass:
             mu_next = sys.float_info.max
             for c in range(1,n):
                 cp1 = c+1
-                for d1 in range((c+1)//2):
-                    d1p1 = d1+1
+                for d1p1 in range(1,(cp1)//2+1):
                     d2p1 = cp1-d1p1
                     n1 = len(tensors_of_size[d1p1])
                     n2 = len(tensors_of_size[d2p1])
