@@ -56,26 +56,26 @@ class NetconClass:
             rpn: Optimal contraction sequence with reverse polish notation.
             cost: Total contraction cost.
         """
-        tensors_of_size_plus1 = self._init_tensors_of_size_plus1()
+        tensors_of_size = self._init_tensors_of_size()
 
-        n = len(tensors_of_size_plus1[0])
+        n = len(self.prime_tensors)
         xi_min = float(min(self.BOND_DIMS))
         mu_cap = 1.0
         mu_old = 0.0
 
-        while len(tensors_of_size_plus1[-1])<1:
+        while len(tensors_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             mu_next = sys.float_info.max
             for c in range(1,n):
                 for d1 in range((c+1)//2):
                     d2 = c-d1-1
-                    n1 = len(tensors_of_size_plus1[d1])
-                    n2 = len(tensors_of_size_plus1[d2])
+                    n1 = len(tensors_of_size[d1+1])
+                    n2 = len(tensors_of_size[d2+1])
                     for i1 in range(n1):
                         i2_start = i1+1 if d1==d2 else 0
                         for i2 in range(i2_start, n2):
-                            t1 = tensors_of_size_plus1[d1][i1]
-                            t2 = tensors_of_size_plus1[d2][i2]
+                            t1 = tensors_of_size[d1+1][i1]
+                            t2 = tensors_of_size[d2+1][i2]
 
                             if self._is_disjoint(t1,t2): continue
                             if self._is_overlap(t1,t2): continue
@@ -87,28 +87,28 @@ class NetconClass:
                             if (mu > mu_0) and (mu <= mu_cap):
                                 t_new = self._contract(t1,t2)
                                 is_find = False
-                                for i,t_old in enumerate(tensors_of_size_plus1[c]):
+                                for i,t_old in enumerate(tensors_of_size[c+1]):
                                     if t_new.bits == t_old.bits:
                                         if t_new.cost < t_old.cost:
-                                            tensors_of_size_plus1[c][i] = t_new
+                                            tensors_of_size[c+1][i] = t_new
                                         is_find = True
                                         break
-                                if not is_find: tensors_of_size_plus1[c].append(t_new)
+                                if not is_find: tensors_of_size[c+1].append(t_new)
             mu_old = mu_cap
             mu_cap = max(mu_next, mu_cap*xi_min)
-            for s in tensors_of_size_plus1:
+            for s in tensors_of_size:
                 for t in s: t.is_new = False
 
-            logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensors_of_size_plus1]))
+            logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensors_of_size]))
 
-        t_final = tensors_of_size_plus1[-1][0]
+        t_final = tensors_of_size[-1][0]
         #print(t_final.rpn)
         return t_final.rpn, t_final.cost
 
 
-    def _init_tensors_of_size_plus1(self):
-        """tensors_of_size_plus1[k] == calculated tensors which is contraction of k+1 prime tensors"""
-        tensors_of_size_plus1 = [[] for t in self.prime_tensors]
+    def _init_tensors_of_size(self):
+        """tensors_of_size[k] == calculated tensors which is contraction of k+1 prime tensors"""
+        tensors_of_size = [[] for size in range(len(self.prime_tensors)+1)]
         for t in self.prime_tensors:
             rpn = t.name
             bits = 0
@@ -116,8 +116,8 @@ class NetconClass:
                 if i>=0: bits += (1<<i)
             bonds = frozenset(t.bonds)
             cost = 0.0
-            tensors_of_size_plus1[0].append(HistTensorFrame(rpn,bits,bonds,cost))
-        return tensors_of_size_plus1
+            tensors_of_size[1].append(HistTensorFrame(rpn,bits,bonds,cost))
+        return tensors_of_size
 
 
     def _get_cost(self,t1,t2):
@@ -149,9 +149,9 @@ class NetconClass:
         return (t1.bits & t2.bits)>0
 
 
-    def _print_tset(self,tensors_of_size_plus1):
-        """Print tensors_of_size_plus1. (for debug)"""
-        for level in range(len(tensors_of_size_plus1)):
-            for i,t in enumerate(tensors_of_size_plus1[level]):
+    def _print_tset(self,tensors_of_size):
+        """Print tensors_of_size. (for debug)"""
+        for level in range(len(tensors_of_size)):
+            for i,t in enumerate(tensors_of_size[level]):
                 print(level,i,t)
 
