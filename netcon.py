@@ -57,20 +57,20 @@ class NetconClass:
             rpn: Optimal contraction sequence with reverse polish notation.
             cost: Total contraction cost.
         """
-        tensors_of_size = self.init_tensors_of_size()
+        tensordict_of_size = self.init_tensordict_of_size()
 
         n = len(self.prime_tensors)
         xi_min = float(min(self.BOND_DIMS))
         mu_cap = 1.0
         prev_mu_cap = 0.0 #>=0
 
-        while len(tensors_of_size[-1])<1:
+        while len(tensordict_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
             next_mu_cap = sys.float_info.max
             for c in range(2,n+1):
                 for d1 in range(1,c//2+1):
                     d2 = c-d1
-                    t1_t2_iterator = itertools.combinations(tensors_of_size[d1], 2) if d1==d2 else itertools.product(tensors_of_size[d1], tensors_of_size[d2])
+                    t1_t2_iterator = itertools.combinations(tensordict_of_size[d1].values(), 2) if d1==d2 else itertools.product(tensordict_of_size[d1].values(), tensordict_of_size[d2].values())
                     for t1, t2 in t1_t2_iterator:
                         if self.are_overlap(t1,t2): continue
                         if self.are_direct_product(t1,t2): continue
@@ -83,29 +83,27 @@ class NetconClass:
                             next_mu_cap = mu
                         elif t1.is_new or t2.is_new or prev_mu_cap < mu:
                             t_new = self.contract(t1,t2)
-                            is_find = False
-                            for i,t_old in enumerate(tensors_of_size[c]):
-                                if t_new.bits == t_old.bits:
-                                    if t_new.cost < t_old.cost:
-                                        tensors_of_size[c][i] = t_new
-                                    is_find = True
-                                    break
-                            if not is_find: tensors_of_size[c].append(t_new)
+                            if t_new.bits in tensordict_of_size[c]:
+                                t_old = tensordict_of_size[c][t_new.bits]
+                                if t_new.cost < t_old.cost:
+                                    tensordict_of_size[c][t_new.bits] = t_new
+                            else:
+                                tensordict_of_size[c][t_new.bits] = t_new
             prev_mu_cap = mu_cap
             mu_cap = max(next_mu_cap, mu_cap*xi_min)
-            for s in tensors_of_size:
-                for t in s: t.is_new = False
+            for s in tensordict_of_size:
+                for t in s.values(): t.is_new = False
 
-            logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensors_of_size]))
+            logging.debug("netcon: tensor_num=" +  str([ len(s) for s in tensordict_of_size]))
 
-        t_final = tensors_of_size[-1][0]
+        t_final = tensordict_of_size[-1][(1<<n)-1]
         #print(t_final.rpn)
         return t_final.rpn, t_final.cost
 
 
-    def init_tensors_of_size(self):
-        """tensors_of_size[k] == calculated tensors which is contraction of k+1 prime tensors"""
-        tensors_of_size = [[] for size in range(len(self.prime_tensors)+1)]
+    def init_tensordict_of_size(self):
+        """tensordict_of_size[k][bits] == calculated lowest-cost tensor which is contraction of k+1 prime tensors and whose bits == bits"""
+        tensordict_of_size = [{} for size in range(len(self.prime_tensors)+1)]
         for t in self.prime_tensors:
             rpn = t.name
             bits = 0
@@ -113,8 +111,8 @@ class NetconClass:
                 if i>=0: bits += (1<<i)
             bonds = frozenset(t.bonds)
             cost = 0.0
-            tensors_of_size[1].append(HistTensorFrame(rpn,bits,bonds,cost))
-        return tensors_of_size
+            tensordict_of_size[1].update({bits:HistTensorFrame(rpn,bits,bonds,cost)})
+        return tensordict_of_size
 
 
     def get_contracting_cost(self,t1,t2):
