@@ -83,10 +83,9 @@ class NetconClass:
                             next_mu_cap = mu
                         elif t1.is_new or t2.is_new or prev_mu_cap < mu:
                             t_new = self.contract(t1,t2)
-                            if t_new.bits in tensordict_of_size[c]:
-                                t_old = tensordict_of_size[c][t_new.bits]
-                                if t_new.cost < t_old.cost:
-                                    tensordict_of_size[c][t_new.bits] = t_new
+                            t_old = tensordict_of_size[c].get(t_new.bits)
+                            if t_old is not None and t_new.cost < t_old.cost:
+                                tensordict_of_size[c][t_new.bits] = t_new
                             else:
                                 tensordict_of_size[c][t_new.bits] = t_new
             prev_mu_cap = mu_cap
