@@ -61,7 +61,7 @@ class NetconClass:
         n = len(self.prime_tensors)
         xi_min = float(min(self.BOND_DIMS))
         mu_cap = 1.0
-        mu_old = 0.0
+        mu_old = 0.0 #>=0
 
         while len(tensors_of_size[-1])<1:
             logging.info("netcon: searching with mu_cap={0:.6e}".format(mu_cap))
@@ -76,10 +76,9 @@ class NetconClass:
                             if self._is_disjoint(t1,t2): continue
 
                             mu = self._get_cost(t1,t2)
-                            mu_0 = 0.0 if (t1.is_new or t2.is_new) else mu_old
 
                             if (mu > mu_cap) and (mu < mu_next): mu_next = mu
-                            if (mu > mu_0) and (mu <= mu_cap):
+                            if (t1.is_new or t2.is_new or mu_old < mu) and (mu <= mu_cap):
                                 t_new = self._contract(t1,t2)
                                 is_find = False
                                 for i,t_old in enumerate(tensors_of_size[c]):
