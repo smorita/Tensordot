@@ -24,6 +24,9 @@ class Tensor:
             self.name = [name]
         self.bonds = bonds[:]
 
+    def __repr__(self):
+        return "Tensor(" + str(self.name) + ", " + str(self.bonds) +")"
+
     def __str__(self):
         return str(self.name) + ", " + str(self.bonds)
 
