@@ -24,6 +24,9 @@ class Tensor:
             self.name = [name]
         self.bonds = bonds[:]
 
+    def __repr__(self):
+        return "Tensor(" + str(self.name) + ", " + str(self.bonds) +")"
+
     def __str__(self):
         return str(self.name) + ", " + str(self.bonds)
 
@@ -449,7 +452,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s:%(message)s", level=config.LOGGING_LEVEL)
 
     tn.output_log("input")
-    rpn, cpu = netcon.netcon(tn, BOND_DIMS)
+    rpn, cpu = netcon.NetconOptimizer(tn.tensors, BOND_DIMS).optimize()
     mem = get_memory(tn, rpn)
 
     TENSOR_MATH_NAMES = TENSOR_NAMES[:]
