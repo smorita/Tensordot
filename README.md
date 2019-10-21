@@ -1,4 +1,7 @@
 # Tensordot
+
+[![DOI](https://zenodo.org/badge/38998367.svg)](https://zenodo.org/badge/latestdoi/38998367)
+
 Code generator for tensor contraction
 
 ## 使用方法
